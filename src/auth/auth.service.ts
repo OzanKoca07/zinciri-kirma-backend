@@ -8,7 +8,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
-  ) {}
+  ) { }
 
   async register(email: string, password: string) {
     const exists = await this.prisma.user.findUnique({ where: { email } });
@@ -31,7 +31,21 @@ export class AuthService {
   }
 
   issueToken(userId: string, email: string) {
-    const accessToken = this.jwt.sign({ sub: userId, email });
-    return { accessToken };
+    // * Kullanılmayan refresh tokenlerin, veri tabanında saklanacağı süreyi tahmin edebilmek için "createdAt" eklendi.
+    const payload = { sub: userId, email, createdAt: new Date() };
+
+    // Access token (kısa ömürlü, örn: 15 dk)
+    const accessToken = this.jwt.sign(payload, {
+      secret: 'ACCESS_TOKEN_SECRET',
+     expiresIn: (process.env.ACCESS_TOKEN_EXPIRES_IN || '15m') as any,
+    });
+
+    // Refresh token (uzun ömürlü, örn: 6 - 12 ay)
+    const refreshToken = this.jwt.sign(payload, {
+      secret: 'REFRESH_TOKEN_SECRET',
+      expiresIn: (process.env.REFRESH_TOKEN_EXPIRES_IN || '365d') as any,
+    });
+
+    return { accessToken, refreshToken };
   }
 }
