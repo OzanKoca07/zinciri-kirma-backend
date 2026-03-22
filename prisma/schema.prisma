@@ -1,0 +1,173 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum RewardType {
+  RECOVERY_PLUS_1
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  backups      SyncBackup[]
+  wallets      RecoveryWallet[]
+  rewarded     RewardedEvent[]
+  habits        Habit[]
+  habitLogs     HabitLog[]
+  xpEvents      XpEvent[]
+  userBadges    UserBadge[]
+  leaderboards  LeaderboardEntry[]
+}
+
+model SyncBackup {
+  id        String   @id @default(uuid())
+  userId    String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+model RecoveryWallet {
+  id        String   @id @default(uuid())
+  userId    String
+  month     String   // YYYY-MM
+  total     Int      @default(2)
+  used      Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, month])
+  @@index([userId, month])
+}
+
+model RewardedEvent {
+  id        String     @id @default(uuid())
+  userId    String
+  rewardType RewardType
+  createdAt DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+
+model Habit {
+  id               String   @id @default(uuid())
+  userId           String
+  title            String
+  emoji            String
+  color            String
+  frequency        HabitFrequency
+  reminderEnabled  Boolean  @default(false)
+  targetValue      Int      @default(1)
+  isArchived       Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs             HabitLog[]
+}
+
+enum HabitFrequency {
+  DAILY
+  WEEKLY
+  CUSTOM
+}
+
+model HabitLog {
+  id               String         @id @default(uuid())
+  habitId          String
+  userId           String
+  logDate          DateTime
+  status           HabitLogStatus
+  progress         Int            @default(0)
+  earnedXp         Int            @default(0)
+  lastProgressDate DateTime?
+  createdAt        DateTime       @default(now())
+
+  habit            Habit          @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([habitId, logDate])
+}
+
+enum HabitLogStatus {
+  DONE
+  MISSED
+  PARTIAL
+}
+enum XpSourceType {
+  HABIT_COMPLETE
+  STREAK_BONUS
+  BADGE_UNLOCK
+  RECOVERY_BONUS
+}
+
+model XpEvent {
+  id          String   @id @default(uuid())
+  userId       String
+  sourceType   XpSourceType
+  sourceId     String?
+  amount       Int
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Badge {
+  id            String   @id @default(uuid())
+  code          String   @unique
+  title         String
+  description   String
+  icon          String
+  xpReward      Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  userBadges    UserBadge[]
+}
+model UserBadge {
+  id            String   @id @default(uuid())
+  userId         String
+  badgeId        String
+  unlockedAt     DateTime @default(now())
+
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge          Badge   @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+}
+model LeaderboardEntry {
+  id            String   @id @default(uuid())
+  userId         String
+  periodType     LeaderboardPeriod
+  periodKey      String
+  score          Int
+  totalXp        Int
+  streak         Int
+  badgeCount     Int
+  level          Int
+  updatedAt      DateTime @updatedAt
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, periodType, periodKey])
+}
+enum LeaderboardPeriod {
+  WEEKLY
+  MONTHLY
+  ALL_TIME
+}
